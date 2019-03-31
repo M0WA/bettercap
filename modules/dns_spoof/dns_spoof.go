@@ -154,7 +154,7 @@ func (mod *DNSSpoofer) Configure() error {
 
 	mod.Hosts = Hosts{}
 	for _, domain := range domains {
-		mod.Hosts = append(mod.Hosts, NewHostEntry(domain, address))
+		mod.Hosts = append(mod.Hosts, NewHostEntry(domain, address,".*"))
 	}
 
 	if hostsFile != "" {
@@ -399,7 +399,7 @@ func (mod *DNSSpoofer) onPacket(pkt gopacket.Packet) {
 	udp := typeUDP.(*layers.UDP)
 	for _, q := range dns.Questions {
 	    qName := string(q.Name)
-	    if address := mod.Hosts.Resolve(qName); address != nil {
+	    if address := mod.Hosts.Resolve(qName,destip); address != nil {
 	        mod.Debug("replying dns query by host lookup %s: %s => %s", qName, srcip, destip )
 	        mod.dnsReply(pkt, eth, udp, qName, address, dns, eth.SrcMAC)
 	        break

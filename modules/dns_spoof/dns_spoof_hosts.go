@@ -18,16 +18,22 @@ type HostEntry struct {
 	Host    string
 	Suffix  string
 	Expr    glob.Glob
+    CliExpr glob.Glob
 	Address net.IP
+    Client  string
 }
 
 func (e HostEntry) Matches(host string) bool {
 	return e.Host == host || strings.HasSuffix(host, e.Suffix) || (e.Expr != nil && e.Expr.Match(host))
 }
 
+func (e HostEntry) MatchesClient(client string) bool {
+	return e.Client == client || (e.CliExpr != nil && e.CliExpr.Match(client))
+}
+
 type Hosts []HostEntry
 
-func NewHostEntry(host string, address net.IP) HostEntry {
+func NewHostEntry(host string, address net.IP, client string) HostEntry {
 	entry := HostEntry{
 		Host:    host,
 		Address: address,
@@ -41,6 +47,10 @@ func NewHostEntry(host string, address net.IP) HostEntry {
 
 	if expr, err := glob.Compile(host); err == nil {
 		entry.Expr = expr
+	}
+
+	if expr, err := glob.Compile(client); err == nil {
+		entry.CliExpr = expr
 	}
 
 	return entry
@@ -60,21 +70,27 @@ func HostsFromFile(filename string, defaultAddress net.IP) (err error, entries [
 		if line == "" || line[0] == '#' {
 			continue
 		}
-		if parts := hostsSplitter.Split(line, 2); len(parts) == 2 {
+        parts := hostsSplitter.Split(line, 2)
+		if len(parts) == 2 {
 			address := net.ParseIP(parts[0])
 			domain := parts[1]
-			entries = append(entries, NewHostEntry(domain, address))
-		} else {
-			entries = append(entries, NewHostEntry(line, defaultAddress))
+			entries = append(entries, NewHostEntry(domain, address, ".*"))
+		} else if len(parts) == 3 {
+			address := net.ParseIP(parts[0])
+			domain := parts[1]
+			cliaddr := parts[2]
+			entries = append(entries, NewHostEntry(domain, address, cliaddr))
+        } else {
+			entries = append(entries, NewHostEntry(line, defaultAddress, ".*"))
 		}
 	}
 
 	return
 }
 
-func (h Hosts) Resolve(host string) net.IP {
+func (h Hosts) Resolve(host string,client string) net.IP {
 	for _, entry := range h {
-		if entry.Matches(host) {
+		if entry.Matches(host) && entry.MatchesClient(client) {
 			return entry.Address
 		}
 	}
